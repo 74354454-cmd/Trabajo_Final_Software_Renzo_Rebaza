@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversor de Unidades - Proyecto Final</title>
+  <style>
+    /* Estilos con diseño azul profesional */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f4f8; display: flex; 
+           justify-content: center; align-items: flex-start; min-height: 100vh; padding: 40px 16px; }
+    .card { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); 
+            padding: 32px; width: 100%; max-width: 500px; }
+    h1 { color: #1F5C99; font-size: 1.6rem; margin-bottom: 8px; text-align: center; }
+    p.sub { color: #666; font-size: 0.9rem; margin-bottom: 24px; text-align: center; }
+    label { display: block; font-weight: bold; color: #333; margin-bottom: 6px; font-size: 0.9rem; }
+    select, input[type=number] { 
+      width: 100%; padding: 12px 14px; border: 1px solid #ccc; 
+      border-radius: 8px; font-size: 1rem; margin-bottom: 16px; outline: none; }
+    select:focus, input:focus { border-color: #1F5C99; box-shadow: 0 0 5px rgba(31,92,153,0.2); }
+    button { width: 100%; padding: 14px; background: #1F5C99; color: white; 
+             border: none; border-radius: 8px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background 0.3s; }
+    button:hover { background: #174d85; }
+    .resultado { margin-top: 20px; padding: 16px; background: #e8f0fb; 
+                 border-radius: 8px; text-align: center; display: none; border: 1px solid #1F5C99; }
+    .resultado span { font-size: 2rem; font-weight: bold; color: #1F5C99; display: block; }
+    .resultado p { color: #555; font-size: 0.85rem; margin-top: 4px; text-transform: capitalize; }
+    .historial { margin-top: 28px; border-top: 1px solid #eee; padding-top: 20px; }
+    .historial h2 { font-size: 1.1rem; color: #444; margin-bottom: 12px; }
+    .historial ul { list-style: none; padding: 0; }
+    .historial li { padding: 10px 12px; background: #f9f9f9; border-radius: 6px; 
+                    margin-bottom: 8px; font-size: 0.85rem; color: #333; border-left: 4px solid #1F5C99; 
+                    display: flex; justify-content: space-between; }
+    .error { color: #c0392b; margin-top: 12px; font-size: 0.9rem; text-align: center; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔁 Conversor de Unidades</h1>
+    <p class="sub">Evaluación Final - Construcción de Software</p>
+    
+    <label for="funcion">Tipo de conversión</label>
+    <select id="funcion">
+      <optgroup label="🌡️ Temperatura">
+        <option value="celsius_to_fahrenheit">Celsius → Fahrenheit</option>
+        <option value="fahrenheit_to_celsius">Fahrenheit → Celsius</option>
+      </optgroup>
+      <optgroup label="📏 Distancia">
+        <option value="km_to_miles">Kilómetros → Millas</option>
+        <option value="miles_to_km">Millas → Kilómetros</option>
+      </optgroup>
+      <optgroup label="⚖️ Peso">
+        <option value="kg_to_pounds">Kg → Libras</option>
+        <option value="pounds_to_kg">Libras → Kg</option>
+      </optgroup>
+    </select>
+
+    <label for="valor">Valor a convertir</label>
+    <input type="number" id="valor" placeholder="Ej: 100" step="any">
+    
+    <button onclick="convertir()">Convertir ahora</button>
+
+    <div class="resultado" id="resultado">
+      <span id="valorResultado"></span>
+      <p id="textoResultado"></p>
+    </div>
+
+    <p class="error" id="error"></p>
+
+    <div class="historial">
+      <h2>📋 Últimas 10 conversiones</h2>
+      <ul id="listaHistorial"><li>Cargando historial...</li></ul>
+    </div>
+  </div>
+
+  <script>
+    // Función para obtener el historial de la base de datos (SQLAlchemy)
+    async function cargarHistorial() {
+      try {
+        const res = await fetch("/historial");
+        const data = await res.json();
+        const ul = document.getElementById("listaHistorial");
+        ul.innerHTML = data.length === 0 
+          ? "<li>No hay conversiones registradas.</li>" 
+          : data.map(c => `<li><span><b>${c.funcion.replace(/_/g," ")}</b></span> <span>${c.entrada} ➔ ${c.salida}</span></li>`).join("");
+      } catch (e) { console.error("Error cargando historial", e); }
+    }
+
+    // Función para enviar los datos a app.py
+    async function convertir() {
+      const funcion = document.getElementById("funcion").value;
+      const valorInput = document.getElementById("valor").value;
+      const errorDiv = document.getElementById("error");
+      const resDiv = document.getElementById("resultado");
+
+      errorDiv.textContent = "";
+      resDiv.style.display = "none";
+
+      if (!valorInput) { 
+        errorDiv.textContent = "Por favor, ingresa un valor numérico."; 
+        return; 
+      }
+
+      try {
+        const response = await fetch("/convertir", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ funcion, valor: parseFloat(valorInput) })
+        });
+        
+        const data = await response.json();
+
+        if (data.error) {
+          errorDiv.textContent = data.error;
+        } else {
+          document.getElementById("valorResultado").textContent = data.resultado.toFixed(2);
+          document.getElementById("textoResultado").textContent = funcion.replace(/_/g, " ");
+          resDiv.style.display = "block";
+          cargarHistorial(); 
+        }
+      } catch (e) {
+        errorDiv.textContent = "Error de conexión con el servidor.";
+      }
+    }
+
+    window.onload = cargarHistorial;
+  </script>
+</body>
+</html>
